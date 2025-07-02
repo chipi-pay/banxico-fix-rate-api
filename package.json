@@ -1,0 +1,26 @@
+{
+  "name": "mid-market-rate",
+  "version": "1.0.0",
+  "description": "Welcome to the Chipi SDK documentation for our **MXN/USD exchange rate serverless function**. This service provides developers with a fair, transparent, and compliant way to fetch the real-time mid-market exchange rate for Mexican Peso (MXN) to US Dollar (USD).",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chipi-pay/mid-market-rate.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/chipi-pay/mid-market-rate/issues"
+  },
+  "homepage": "https://github.com/chipi-pay/mid-market-rate#readme",
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "@vercel/node": "^5.3.0",
+    "typescript": "^5.8.3"
+  }
+}
