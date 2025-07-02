@@ -11,7 +11,7 @@ Welcome to the Chipi SDK documentation for our **MXN/USD exchange rate serverles
 Exchange rates don’t need to be complicated. There’s only one rate that truly matters: the **mid-market rate**.
 
 - **What is the mid-market rate?**  
-  The mid-market rate is the midpoint between the buy and sell prices for a currency on the global market. It’s the “real” rate that banks use when trading between themselves, and it’s widely recognized as the fairest and most transparent rate available.
+  The mid-market rate is the midpoint between the buy and sell prices for a currency on the global market. It’s the “real” rate that banks use when trading between themselves, and it’s widely recognized as the fairest and most transparent rate available. 
 
 - **Why does Chipi use it?**  
   Most banks and money transfer providers add hidden markups to their exchange rates, making it hard to know the true cost of currency conversion. By using the mid-market rate, Chipi ensures you always get a transparent, unbiased, and competitive rate—free from hidden fees or artificial spreads.
