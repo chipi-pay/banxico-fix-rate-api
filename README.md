@@ -165,4 +165,3 @@ vercel
 
 **Chipi SDK** is committed to fairness, transparency, and compliance.  
 For more details, visit [docs.chipipay.com](https://docs.chipipay.com) or contact our support team.
-```
