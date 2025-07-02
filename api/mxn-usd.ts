@@ -1,12 +1,22 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const BANXICO_TOKEN = process.env.BANXICO_TOKEN; // Store your Banxico token securely
+const BANXICO_TOKEN = process.env.BANXICO_TOKEN; // Store securely in your environment
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Fetch both buy (SF46410) and sell (SF46406) rates
+    // Optional fee as a decimal (e.g., 0.01 for 1%)
+    const feeParam = req.query.fee;
+    let fee = 0;
+    if (feeParam) {
+      const parsed = parseFloat(Array.isArray(feeParam) ? feeParam[0] : feeParam);
+      if (!isNaN(parsed) && parsed >= 0 && parsed < 1) {
+        fee = parsed;
+      }
+    }
+
+    // Fetch the Banxico FIX rate (USD/MXN)
     const apiRes = await fetch(
-      'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF46410,SF46406/datos/oportuno',
+      'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno',
       {
         headers: {
           'Bmx-Token': BANXICO_TOKEN as string,
@@ -20,41 +30,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await apiRes.json();
-    // Extract buy and sell rates
-    const buySerie = data?.bmx?.series?.find((s: any) => s.idSerie === 'SF46410');
-    const sellSerie = data?.bmx?.series?.find((s: any) => s.idSerie === 'SF46406');
+    const serie = data?.bmx?.series?.[0];
+    const rateStr = serie?.datos?.[0]?.dato;
+    const dateStr = serie?.datos?.[0]?.fecha;
 
-    const buyRateStr = buySerie?.datos?.[0]?.dato;
-    const sellRateStr = sellSerie?.datos?.[0]?.dato;
-    const dateStr = buySerie?.datos?.[0]?.fecha || sellSerie?.datos?.[0]?.fecha;
+    let isoDate = dateStr;
+    if (dateStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('/');
+      isoDate = `${year}-${month}-${day}`;
+    }
 
-    if (buyRateStr && sellRateStr) {
-      const buy = parseFloat(buyRateStr.replace(',', ''));
-      const sell = parseFloat(sellRateStr.replace(',', ''));
-
-      // Calculate mid-market rate
-      const mid = ((buy + sell) / 2);
-
-      // Format date as ISO if possible
-      let isoDate = dateStr;
-      if (dateStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-        const [day, month, year] = dateStr.split('/');
-        isoDate = `${year}-${month}-${day}`;
-      }
+    if (rateStr) {
+      const referenceRate = parseFloat(rateStr.replace(',', ''));
+      const customerRate = parseFloat((referenceRate * (1 + fee)).toFixed(6));
 
       res.status(200).json({
-        mxn_usd: {
-          buy,
-          sell,
-          mid: parseFloat(mid.toFixed(6)),
+        reference: {
+          rate: referenceRate,
+          date: isoDate,
+          source: "FIX",
+          provider: "Banxico",
+          note: "The FIX rate is Banxico's official reference for USD/MXN."
         },
-        date: isoDate,
-        source: "mid-market",
-        provider: "Banxico",
-        note: "The mid-market rate is the average of Banxico's wholesale buy and sell rates (SF46410, SF46406)."
+        fee: fee,
+        customer_rate: customerRate,
+        explanation: `customer_rate = reference_rate * (1 + fee)`
       });
     } else {
-      res.status(502).json({ error: "Could not parse buy/sell rates from Banxico" });
+      res.status(502).json({ error: "Could not parse FIX rate from Banxico" });
     }
   } catch (error) {
     console.error("Banxico API error:", error);
