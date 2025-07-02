@@ -1,64 +1,63 @@
-# Chipi SDK – MXN/USD Mid-Market Exchange Rate API
+# banxico-fix-rate-api
 
-Welcome to the Chipi SDK documentation for our **MXN/USD exchange rate serverless function**. This service provides developers with a fair, transparent, and compliant way to fetch the real-time mid-market exchange rate for Mexican Peso (MXN) to US Dollar (USD) using official data from Banco de México (Banxico).
+**A transparent API for USD/MXN exchange rates based on the official Banxico FIX rate, with optional configurable markup.**
 
-## Why Use the Mid-Market Rate?
+## Why This API?
 
-**The Only Fair Exchange Rate: The Mid-Market Rate**
+Most currency APIs either use unclear sources or hide their markups. This project is different:
 
-Exchange rates don’t need to be complicated. There’s only one rate that truly matters: the **mid-market rate**.
+- **Official Reference:** Uses the Banxico FIX rate, the official USD/MXN rate for regulatory, accounting, and settlement purposes in Mexico.
+- **Transparent Fee:** Lets you apply a clear, configurable markup (fee) to the reference rate, so your customers always know what they’re paying.
+- **Simple & Fast:** Deployable as a Vercel serverless function in minutes.
 
-- **What is the mid-market rate?**  
-  The mid-market rate is the midpoint between the buy and sell prices for a currency on the global market. It’s the “real” rate that banks use when trading between themselves, and it’s widely recognized as the fairest and most transparent rate available.
+## How It Works
 
-- **Why does Chipi use it?**  
-  Most banks and money transfer providers add hidden markups to their exchange rates, making it hard to know the true cost of currency conversion. By using the mid-market rate, Chipi ensures you always get a transparent, unbiased, and competitive rate—free from hidden fees or artificial spreads.
+- **Reference Rate:** The API fetches the latest Banxico FIX rate (`SF43718`) for USD/MXN.
+- **Fee (Markup):** You can specify a markup (as a decimal, e.g., `0.01` for 1%) via a query parameter.
+- **Customer Rate:** The API calculates the customer-facing rate as `reference_rate * (1 + fee)`.
+- **Full Transparency:** The API response shows the reference rate, the fee, and the final customer rate.
 
-- **Full transparency:**  
-  The rate you see is the rate you get. No misleading “0% fee” claims, no hidden costs in the small print.
+## Example
 
-- **Regulatory compliance:**  
-  The mid-market rate is accepted by accounting and regulatory bodies as a reputable, consistent benchmark for reporting and settlements.
+**Request:**
+```
+GET /api/mxn-usd?fee=0.01
+```
 
-**Learn more about the mid-market rate and why it matters on [Wise’s rate tracker](https://wise.com/gb/currency-converter/mxn-to-usd-rate).**
+**Response:**
+```json
+{
+  "reference": {
+    "rate": 18.754,
+    "date": "2025-07-02",
+    "source": "FIX",
+    "provider": "Banxico",
+    "note": "The FIX rate is Banxico's official reference for USD/MXN."
+  },
+  "fee": 0.01,
+  "customer_rate": 18.94154,
+  "explanation": "customer_rate = reference_rate * (1 + fee)"
+}
+```
 
-## How Chipi Calculates the Mid-Market Rate with Banxico
-
-Chipi fetches the **official wholesale buy and sell rates for USD/MXN** directly from Banxico’s SIE API and calculates the mid-market rate as their average:
-
-$$
-\text{Mid-market rate} = \frac{\text{Buy Rate} + \text{Sell Rate}}{2}
-$$
-
-- **Buy Rate:** Banxico’s wholesale market buy rate for USD/MXN (see series ID below).
-- **Sell Rate:** Banxico’s wholesale market sell rate for USD/MXN (see series ID below).
-- **Mid-market Rate:** The average of the above, representing the fairest, most transparent rate.
-
-**About Series IDs:**  
-Banxico assigns a unique, permanent series ID to each economic indicator. For USD/MXN, you must use the correct IDs for the buy and sell rates. These IDs are fixed and published in Banxico’s [official catalog](https://www.banxico.org.mx/SieAPIRest/service/v1/doc/catalogoSeries).  
-*You can make these IDs configurable in your code for flexibility and future-proofing.*
-
-## Quick Start: Deploying the Chipi Exchange Rate API on Vercel (TypeScript)
-
-This guide will help you set up and deploy the Chipi MXN/USD exchange rate API using Vercel serverless functions with TypeScript.
+## Quick Start
 
 ### 1. Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
-- [Vercel CLI](https://vercel.com/download) installed globally (`npm i -g vercel`)
+- [Node.js](https://nodejs.org/) (v18 or higher)
+- [Vercel CLI](https://vercel.com/download)
 - A [Vercel account](https://vercel.com/signup)
 - A Banxico SIE API token ([get yours here](https://www.banxico.org.mx/SieAPIRest/service/v1/token))
 
-### 2. Project Setup
+### 2. Setup
 
 ```bash
-mkdir chipi-exchange-rate
-cd chipi-exchange-rate
-npm init -y
-npm install --save-dev typescript @types/node @vercel/node
+git clone https://github.com/your-org/banxico-fix-rate-api.git
+cd banxico-fix-rate-api
+npm install
 ```
 
-Create a `tsconfig.json` file:
+Create a `tsconfig.json` if it doesn’t exist:
 
 ```json
 {
@@ -73,23 +72,37 @@ Create a `tsconfig.json` file:
 }
 ```
 
-### 3. Create the API Endpoint
+### 3. Add Your Banxico Token
 
-#### File: `api/mxn-usd-midrate.ts`
+Set your Banxico API token as an environment variable in Vercel or `.env` file:
+```
+BANXICO_TOKEN=your_banxico_token_here
+```
+
+### 4. Create the API Endpoint
+
+Create `api/mxn-usd.ts`:
 
 ```typescript
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const BANXICO_TOKEN = process.env.BANXICO_TOKEN; // Store your Banxico token securely
+const BANXICO_TOKEN = process.env.BANXICO_TOKEN; // Store securely in your environment
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    // Replace with the correct Banxico series IDs for USD/MXN buy and sell rates
-    const BUY_SERIE = process.env.BANXICO_BUY_SERIE || 'SFXXXXX'; // USD/MXN buy rate
-    const SELL_SERIE = process.env.BANXICO_SELL_SERIE || 'SFYYYYY'; // USD/MXN sell rate
+    // Optional fee as a decimal (e.g., 0.01 for 1%)
+    const feeParam = req.query.fee;
+    let fee = 0;
+    if (feeParam) {
+      const parsed = parseFloat(Array.isArray(feeParam) ? feeParam[0] : feeParam);
+      if (!isNaN(parsed) && parsed >= 0 && parsed < 1) {
+        fee = parsed;
+      }
+    }
 
+    // Fetch the Banxico FIX rate (USD/MXN)
     const apiRes = await fetch(
-      `https://www.banxico.org.mx/SieAPIRest/service/v1/series/${BUY_SERIE},${SELL_SERIE}/datos/oportuno`,
+      'https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/oportuno',
       {
         headers: {
           'Bmx-Token': BANXICO_TOKEN as string,
@@ -103,37 +116,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = await apiRes.json();
-    const buySerie = data?.bmx?.series?.find((s: any) => s.idSerie === BUY_SERIE);
-    const sellSerie = data?.bmx?.series?.find((s: any) => s.idSerie === SELL_SERIE);
+    const serie = data?.bmx?.series?.[0];
+    const rateStr = serie?.datos?.[0]?.dato;
+    const dateStr = serie?.datos?.[0]?.fecha;
 
-    const buyRateStr = buySerie?.datos?.[0]?.dato;
-    const sellRateStr = sellSerie?.datos?.[0]?.dato;
-    const dateStr = buySerie?.datos?.[0]?.fecha || sellSerie?.datos?.[0]?.fecha;
+    let isoDate = dateStr;
+    if (dateStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+      const [day, month, year] = dateStr.split('/');
+      isoDate = `${year}-${month}-${day}`;
+    }
 
-    if (buyRateStr && sellRateStr) {
-      const buy = parseFloat(buyRateStr.replace(',', ''));
-      const sell = parseFloat(sellRateStr.replace(',', ''));
-      const mid = ((buy + sell) / 2);
-
-      let isoDate = dateStr;
-      if (dateStr && /^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-        const [day, month, year] = dateStr.split('/');
-        isoDate = `${year}-${month}-${day}`;
-      }
+    if (rateStr) {
+      const referenceRate = parseFloat(rateStr.replace(',', ''));
+      const customerRate = parseFloat((referenceRate * (1 + fee)).toFixed(6));
 
       res.status(200).json({
-        mxn_usd: {
-          buy,
-          sell,
-          mid: parseFloat(mid.toFixed(6)),
+        reference: {
+          rate: referenceRate,
+          date: isoDate,
+          source: "FIX",
+          provider: "Banxico",
+          note: "The FIX rate is Banxico's official reference for USD/MXN."
         },
-        date: isoDate,
-        source: "mid-market",
-        provider: "Banxico",
-        note: "The mid-market rate is the average of Banxico's wholesale buy and sell rates."
+        fee: fee,
+        customer_rate: customerRate,
+        explanation: "customer_rate = reference_rate * (1 + fee)"
       });
     } else {
-      res.status(502).json({ error: "Could not parse buy/sell rates from Banxico" });
+      res.status(502).json({ error: "Could not parse FIX rate from Banxico" });
     }
   } catch (error) {
     console.error("Banxico API error:", error);
@@ -142,58 +152,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 ```
 
-- **Configure your Banxico series IDs** as environment variables (`BANXICO_BUY_SERIE`, `BANXICO_SELL_SERIE`) for flexibility and future-proofing.  
-- **Get your Banxico API token** and store it as `BANXICO_TOKEN` in your environment.
-
-### 4. Deploy to Vercel
+## Deploy to Vercel
 
 ```bash
 vercel login
 vercel
 ```
 
-- Follow the prompts to link or create a new project.
+Follow the prompts to link or create a new project.
 
 ## Usage
 
-**GET** `/api/mxn-usd-midrate`
+- **GET `/api/mxn-usd`** – Returns the latest Banxico FIX rate.
+- **GET `/api/mxn-usd?fee=0.01`** – Returns the FIX rate plus a 1% markup.
 
-**Response:**
+## How to Set a Competitive Fee
 
-```json
-{
-  "mxn_usd": {
-    "buy": 18.7400,
-    "sell": 18.7680,
-    "mid": 18.754
-  },
-  "date": "2025-07-02",
-  "source": "mid-market",
-  "provider": "Banxico",
-  "note": "The mid-market rate is the average of Banxico's wholesale buy and sell rates."
-}
-```
-
-- `mxn_usd.buy`: Banxico's official wholesale buy rate for USD/MXN.
-- `mxn_usd.sell`: Banxico's official wholesale sell rate for USD/MXN.
-- `mxn_usd.mid`: The calculated mid-market rate.
-- `date`: The date of the rates (ISO format).
-- `source`: Always "mid-market" for this endpoint.
-- `provider`: The data provider (Banxico).
+- **Fintechs:** 0.3%–1% is highly competitive.
+- **Traditional banks:** 1.5%–3% is common.
+- **Always disclose your markup for transparency.**
 
 ## Troubleshooting
 
-- Ensure your `api/mxn-usd.ts` file is in the correct directory.
-- Set your Banxico token and series IDs as environment variables in Vercel.
-- Vercel automatically detects and compiles TypeScript serverless functions—no extra build steps are needed.
-- If you need to customize your build, add or update your `vercel.json` configuration.
+- Ensure your Banxico token is valid and set as an environment variable.
+- If you get a 502 or 500 error, check the Banxico API status or your token.
+- Vercel automatically detects and compiles TypeScript serverless functions.
 
 ## License
 
 © ChipiPay 2025. All rights reserved.
 
-**Chipi SDK** is committed to fairness, transparency, and compliance.  
+**banxico-fix-rate-api** is committed to transparency, fairness, and compliance.  
 For more details, visit [docs.chipipay.com](https://docs.chipipay.com) or contact our support team.
-
-**Note:**  
-Banxico series IDs are fixed references to specific economic indicators. Always verify you are using the correct IDs for USD/MXN buy and sell rates by consulting Banxico’s [official catalog](https://www.banxico.org.mx/SieAPIRest/service/v1/doc/catalogoSeries). For maximum flexibility, make these IDs configurable in your deployment.
